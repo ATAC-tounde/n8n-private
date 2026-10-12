@@ -96,7 +96,7 @@ export interface AgentTaskImportMappings {
 }
 
 export function requiredAgentScopes(plan: AgentImportPlan): Scope[] {
-	const scopes = new Set<Scope>(['agent:read']);
+	const scopes = new Set<Scope>(['agent:import', 'agent:read']);
 	for (const item of plan.items) {
 		if (item.action === 'skip') continue;
 		scopes.add(item.action === 'create' ? 'agent:create' : 'agent:update');
