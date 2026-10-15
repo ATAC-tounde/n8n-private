@@ -17,6 +17,8 @@ import type { AgentExecution } from '../entities/agent-execution.entity';
 import type { AgentExecutionThread } from '../entities/agent-execution-thread.entity';
 import type { N8NCheckpointStorage } from '../integrations/n8n-checkpoint-storage';
 import type { AgentExecutionRepository } from '../repositories/agent-execution.repository';
+import { SystemAgentRegistry } from '../system-agents/system-agent-registry';
+import type { SystemAgentProvider } from '../system-agents/system-agent.types';
 
 const context = {
 	projectId: 'project-1',
@@ -58,6 +60,11 @@ const checkpoint = mock<SerializableAgentState>({
 	},
 });
 
+/** Makes the agent of the test thread a system agent. */
+function registerSystemAgent(systemAgents: SystemAgentRegistry) {
+	systemAgents.register(mock<SystemAgentProvider>({ agentId: 'agent-1', name: 'System agent' }));
+}
+
 function makeService(isMultiMain = true) {
 	const repository = mock<AgentExecutionRepository>();
 	const executionService = mock<AgentExecutionService>();
@@ -66,6 +73,7 @@ function makeService(isMultiMain = true) {
 	const updates = mock<AgentExecutionUpdateBroadcaster>();
 	const steering = mock<AgentMessageSteeringService>();
 	const backgroundJobs = mock<AgentBackgroundJobService>();
+	const systemAgents = new SystemAgentRegistry();
 	const service = new AgentChatExecutionService(
 		Container.get(LockService),
 		repository,
@@ -76,6 +84,7 @@ function makeService(isMultiMain = true) {
 		updates,
 		steering,
 		backgroundJobs,
+		systemAgents,
 	);
 	executionService.findThreadById.mockResolvedValue(thread);
 	repository.findOneBy.mockImplementation(async (where) =>
@@ -89,6 +98,7 @@ function makeService(isMultiMain = true) {
 	checkpointStorage.cancelSuspended.mockResolvedValue(true);
 	return {
 		service,
+		systemAgents,
 		repository,
 		executionService,
 		checkpointStorage,
@@ -213,6 +223,7 @@ it('keeps pubsub wire compatibility with a main still on the old productionN8nCh
 it('relays Stop of a system-agent turn with its own surface and memory scope', async () => {
 	const mainA = makeService();
 	const mainB = makeService();
+	for (const main of [mainA, mainB]) registerSystemAgent(main.systemAgents);
 	const controller = new AbortController();
 	const system = { ...context, surface: 'system' as const };
 	mainA.service.register(system, controller);
@@ -237,10 +248,27 @@ it('relays Stop of a system-agent turn with its own surface and memory scope', a
 });
 
 it('does not let the Preview surface stop a system-agent turn', async () => {
-	const { service, repository } = makeService(false);
+	const { service, repository, systemAgents } = makeService(false);
+	registerSystemAgent(systemAgents);
 	repository.findOneBy.mockResolvedValue({ ...running, source: 'system_chat' });
 
 	await expect(service.requestCancel(context)).rejects.toThrow('Execution not found');
+});
+
+it('does not let the Preview surface stop a system-agent turn with a Preview source', async () => {
+	const { service, systemAgents } = makeService(false);
+	registerSystemAgent(systemAgents);
+
+	await expect(service.requestCancel(context)).rejects.toThrow('Execution not found');
+});
+
+it('does not let the system surface stop a turn of a project agent', async () => {
+	const { service, repository } = makeService(false);
+	repository.findOneBy.mockResolvedValue({ ...running, source: 'system_chat' });
+
+	await expect(service.requestCancel({ ...context, surface: 'system' })).rejects.toThrow(
+		'Execution not found',
+	);
 });
 
 it.each(['local', 'remote', 'during validation'] as const)(
