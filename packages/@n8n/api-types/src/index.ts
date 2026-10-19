@@ -172,6 +172,7 @@ export {
 	promotionConnectionIdParamSchema,
 	promotionDirectionParamSchema,
 	promotionProviderIdParamSchema,
+	promotionReviewIdParamSchema,
 	roleMappingRuleIdParamSchema,
 	roleSlugParamSchema,
 	tagIdParamSchema,

@@ -1,8 +1,10 @@
+import type { PromotionProviderAuthType, PromotionReviewType } from '@n8n/api-types';
 import { Service } from '@n8n/di';
 
 import { BadRequestError } from '@n8n/errors';
 
-import { repositoryPathFromUrl } from './git-hosts/git-host-target';
+import type { PromotionConnection } from './database/entities/promotion-connection.entity';
+import { promotionHostBaseUrl, repositoryPathFromUrl } from './git-hosts/git-host-target';
 import type { GitHostAccess } from './git-hosts/git-host.types';
 import { PromotionProvidersService } from './promotion-providers.service';
 import type { PromotionOperationInput } from './promotions.types';
@@ -23,28 +25,44 @@ export class PromotionReviewHostResolver {
 
 	async resolve(input: PromotionOperationInput): Promise<PromotionReviewHost | null> {
 		if (input.providerType !== 'gitlab') return null;
-		if (!input.hostBaseUrl) {
+
+		const access = await this.accessFor(input.hostBaseUrl, {
+			authType: input.authType,
+			auth: input.encryptedAuth,
+		});
+		return {
+			access,
+			projectPath: repositoryPathFromUrl(access.baseUrl, input.target.remoteUrl),
+		};
+	}
+
+	/** Host access for a stored review. NULL when the provider no longer matches the review type. */
+	async resolveForConnection(
+		connection: PromotionConnection,
+		type: PromotionReviewType,
+	): Promise<GitHostAccess | null> {
+		const provider = await this.providersService.getEntity(connection.providerId);
+		if (provider.type !== type) return null;
+		return await this.accessFor(promotionHostBaseUrl(provider), provider);
+	}
+
+	private async accessFor(
+		baseUrl: string | null,
+		storedAuth: { authType: PromotionProviderAuthType; auth: string },
+	): Promise<GitHostAccess> {
+		if (!baseUrl) {
 			throw new BadRequestError(
 				'The stored provider config cannot be read. Update the provider to replace it.',
 			);
 		}
 
-		const credentials = await this.providersService.decryptCredentials({
-			authType: input.authType,
-			auth: input.encryptedAuth,
-		});
+		const credentials = await this.providersService.decryptCredentials(storedAuth);
 		if (credentials.authType !== 'token') {
 			throw new BadRequestError(
 				'The stored provider credentials cannot be read. Update the provider to replace them.',
 			);
 		}
 
-		return {
-			access: {
-				baseUrl: input.hostBaseUrl,
-				accessToken: credentials.password,
-			},
-			projectPath: repositoryPathFromUrl(input.hostBaseUrl, input.target.remoteUrl),
-		};
+		return { baseUrl, accessToken: credentials.password };
 	}
 }

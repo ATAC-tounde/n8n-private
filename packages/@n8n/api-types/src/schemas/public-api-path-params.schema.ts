@@ -45,6 +45,10 @@ export const promotionConnectionIdParamSchema = stringIdParamSchema(
 export const promotionProviderIdParamSchema = stringIdParamSchema(
 	'The ID of the promotion provider.',
 );
+export const promotionReviewIdParamSchema = z
+	.string()
+	.refine((value) => validator.isUUID(value), { message: 'must be a valid ID' })
+	.openapi({ param: { description: 'The ID of the promotion review.' } });
 
 export const promotionDirectionParamSchema = z.string().openapi({
 	enum: [...promotionDirectionSchema.options],

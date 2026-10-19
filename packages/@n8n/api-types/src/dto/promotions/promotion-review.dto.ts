@@ -50,9 +50,17 @@ const promotionReviewRemoteSchema = z.object({
 export type PromotionReviewRemote = z.infer<typeof promotionReviewRemoteSchema>;
 
 /**
- * One inbox row. The branch and commit stay off this row. They live on the newest
- * run, and the list query does not load runs.
+ * Why `remote` is NULL. Computed for each request and never stored. `no_connection`
+ * means the connection was deleted or its provider no longer matches the review type.
  */
+export const promotionReviewRemoteErrorSchema = z.enum([
+	'not_found',
+	'auth',
+	'unreachable',
+	'no_connection',
+]);
+export type PromotionReviewRemoteError = z.infer<typeof promotionReviewRemoteErrorSchema>;
+
 export const promotionReviewSummarySchema = z.object({
 	id: n8nIdSchema,
 	state: promotionReviewStateSchema,
@@ -66,78 +74,17 @@ export const promotionReviewSummarySchema = z.object({
 	/** Time of the latest state change. NULL until the first change. */
 	lastStateChangeAt: z.string().datetime().nullable(),
 	remote: promotionReviewRemoteSchema.nullable(),
+	remoteError: promotionReviewRemoteErrorSchema.nullable(),
 });
 export type PromotionReviewSummary = z.infer<typeof promotionReviewSummarySchema>;
 
-export const promotionReviewListPublicSchema = z.object({
-	count: z.number().int().nonnegative(),
-	data: z.array(promotionReviewSummarySchema),
-});
-export class PromotionReviewListPublicDto extends Z.class(promotionReviewListPublicSchema.shape) {}
-
-/** Open rows are one tab, every terminal state is the other. */
-export const promotionReviewTabSchema = z.enum(['open', 'closed']);
-export type PromotionReviewTab = z.infer<typeof promotionReviewTabSchema>;
-
-export class ListPromotionReviewsQueryDto extends Z.class({
-	tab: promotionReviewTabSchema.optional(),
-	offset: z.coerce.number().int().nonnegative().optional(),
-	limit: z.coerce.number().int().positive().max(100).optional(),
-}) {}
-
-export const promotionReviewChangeKindSchema = z.enum(['added', 'modified', 'deleted']);
-export type PromotionReviewChangeKind = z.infer<typeof promotionReviewChangeKindSchema>;
-
-/** A workflow the Promotion Review changed against the Review Baseline. */
-export const promotionReviewWorkflowChangeSchema = z.object({
-	workflowId: z.string(),
-	name: z.string(),
-	projectName: z.string().nullable(),
-	change: promotionReviewChangeKindSchema,
-	/** Repository path of the workflow file at the head commit, or at the baseline for a deletion. */
-	path: z.string(),
-});
-export type PromotionReviewWorkflowChange = z.infer<typeof promotionReviewWorkflowChangeSchema>;
-
-/** The detail view: the row, the newest run, the merge request, and the changed workflows. */
 export const promotionReviewDetailSchema = promotionReviewSummarySchema.extend({
-	/** The branch of the newest run. */
-	branchName: z.string(),
-	/** The commit of the newest run. */
-	commitSha: z.string(),
-	mergeRequest: z
-		.object({
-			description: z.string().nullable(),
-			sourceBranch: z.string(),
-			targetBranch: z.string(),
-			authorName: z.string().nullable(),
-			approvalsLeft: z.number().int().nullable(),
-			mergeStatus: z.string().nullable(),
-		})
-		.nullable(),
-	/**
-	 * The commit the review diffs against. Open: the merge base of the promotion
-	 * branch head and the base branch. Merged or closed: the base the host reports.
-	 * NULL when neither can be read.
-	 */
-	baselineCommitSha: z.string().nullable(),
-	workflows: z.array(promotionReviewWorkflowChangeSchema),
-	/** Why parts of the detail are missing, for the UI to show. */
-	warnings: z.array(z.string()),
+	config: z.object({ id: n8nIdSchema, name: z.string() }).nullable(),
+	branchName: z.string().nullable(),
+	headCommitSha: z.string().nullable(),
 });
+export type PromotionReviewDetail = z.infer<typeof promotionReviewDetailSchema>;
 export class PromotionReviewDetailDto extends Z.class(promotionReviewDetailSchema.shape) {}
-
-/** The two sides of a workflow diff. A side is NULL when the workflow does not exist on that commit. */
-export const promotionReviewWorkflowDiffSchema = z.object({
-	workflowId: z.string(),
-	baselineCommitSha: z.string().nullable(),
-	headCommitSha: z.string(),
-	base: z.record(z.unknown()).nullable(),
-	head: z.record(z.unknown()).nullable(),
-});
-export class PromotionReviewWorkflowDiffDto extends Z.class(
-	promotionReviewWorkflowDiffSchema.shape,
-) {}
 
 /** The merge request a Promote opened, as returned with the promote result. */
 export const promotionMergeRequestResultSchema = z.object({

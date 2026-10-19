@@ -10,6 +10,7 @@ import { Service } from '@n8n/di';
 import {
 	BadRequestError,
 	ConflictError,
+	NotFoundError,
 	ServiceUnavailableError,
 	TooManyRequestsError,
 	UnexpectedError,
@@ -123,7 +124,7 @@ type TransportFailure = {
 	error: BadRequestError | ServiceUnavailableError;
 };
 
-/** Opens GitLab merge requests. GitLab records each write as the token's bot user. */
+/** Opens and reads GitLab merge requests. GitLab records each write as the token's bot user. */
 @Service()
 export class GitLabMergeRequestClient {
 	private readonly http: HttpRequestClient;
@@ -152,6 +153,17 @@ export class GitLabMergeRequestClient {
 				// Keep the source branch until the connection can choose this.
 				remove_source_branch: false,
 			},
+		});
+		return this.parse(mergeRequestSchema, body);
+	}
+
+	async getMergeRequest(
+		access: GitHostAccess,
+		{ projectId, iid }: MergeRequestRef,
+	): Promise<GitLabMergeRequest> {
+		const { body } = await this.request(access, {
+			method: 'GET',
+			path: `projects/${projectId}/merge_requests/${iid}`,
 		});
 		return this.parse(mergeRequestSchema, body);
 	}
@@ -271,7 +283,7 @@ const statusError = (status: number, body: unknown) => {
 				'The access token may not perform this merge request action. Check the token scopes and role.',
 			);
 		case 404:
-			return new BadRequestError('GitLab could not find the project or merge request.');
+			return new NotFoundError('GitLab could not find the project or merge request.');
 		case 408:
 			return new ServiceUnavailableError(
 				'The GitLab request timed out. Check that GitLab is available and try again.',

@@ -307,6 +307,9 @@
 		"POST /promotions/connections/{promotionConnectionId}/apply": {
 			"status": "gap"
 		},
+		"GET /promotions/reviews/{promotionReviewId}": {
+			"status": "gap"
+		},
 		"GET /settings/security-policy": {
 			"status": "gap"
 		},
