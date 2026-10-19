@@ -105,4 +105,8 @@ export {
 	RestrictedNodeTypesProviderProxy,
 	type RestrictedNodeTypesProvider,
 } from './workflows/restricted-node-types-provider-proxy.service';
+export {
+	InstalledTypeRestrictionsProxy,
+	type InstalledTypeRestrictionsProvider,
+} from './services/installed-type-restrictions-proxy.service';
 export * from './auth';
