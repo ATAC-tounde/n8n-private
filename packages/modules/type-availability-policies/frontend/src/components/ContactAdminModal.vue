@@ -7,7 +7,7 @@ import { useUsersStore } from '@n8n/stores/users.store';
 import { computed, ref, watch } from 'vue';
 
 import {
-	CONTACT_ADMIN_COPY,
+	CONTACT_DIALOG_COPY,
 	RESTRICTED_TYPE_COPY,
 	type ContactAudience,
 	type RestrictedTypeKind,
@@ -33,9 +33,9 @@ const policiesStore = useTypeAvailabilityPoliciesStore();
 const isLoading = ref(false);
 let lookupId = 0;
 
-const copy = computed(() => CONTACT_ADMIN_COPY[audience]);
+const copy = computed(() => CONTACT_DIALOG_COPY[audience]);
 const description = computed(() =>
-	i18n.baseText(copy.value.dialogDescription[kind], {
+	i18n.baseText(copy.value.description[kind], {
 		interpolate: { nodeType: nodeTypeName },
 	}),
 );
@@ -45,34 +45,26 @@ const mailSubject = computed(() =>
 	}),
 );
 
-type Admin = {
-	id: string;
-	firstName?: string | null;
-	lastName?: string | null;
-	fullName?: string;
-	email: string;
-};
+type Admin = { id: string; firstName?: string | null; lastName?: string | null; email: string };
+
+function hasEmail<T extends { email?: string | null }>(person: T): person is T & { email: string } {
+	return Boolean(person.email);
+}
+
+function displayName({ firstName, lastName, email }: Admin): string {
+	return [firstName, lastName].filter(Boolean).join(' ') || email;
+}
 
 const instanceAdmins = computed<Admin[]>(() =>
-	usersStore.allUsers.flatMap((user) =>
-		user.role === ROLE.Owner && !user.isPendingUser && user.email
-			? [{ ...user, email: user.email }]
-			: [],
-	),
+	usersStore.allUsers
+		.filter((user) => user.role === ROLE.Owner && !user.isPendingUser)
+		.filter(hasEmail),
 );
 
 const projectAdmins = computed<Admin[]>(() =>
-	(policiesStore.policyProject?.relations ?? []).flatMap((relation) =>
-		relation.role === PROJECT_ADMIN_ROLE_SLUG && relation.email
-			? [
-					{
-						...relation,
-						email: relation.email,
-						fullName: [relation.firstName, relation.lastName].filter(Boolean).join(' '),
-					},
-				]
-			: [],
-	),
+	(policiesStore.policyProject?.relations ?? [])
+		.filter((relation) => relation.role === PROJECT_ADMIN_ROLE_SLUG)
+		.filter(hasEmail),
 );
 
 const admins = computed(() =>
@@ -101,7 +93,7 @@ function mailtoHref(email: string): string {
 <template>
 	<N8nDialog
 		v-model:open="open"
-		:header="i18n.baseText(copy.dialogTitle)"
+		:header="i18n.baseText(copy.title)"
 		:description="description"
 		size="medium"
 		stacked
@@ -116,7 +108,7 @@ function mailtoHref(email: string): string {
 			<li v-for="admin in admins" :key="admin.id" :class="$style.admin">
 				<N8nAvatar :first-name="admin.firstName" :last-name="admin.lastName" size="small" />
 				<div :class="$style.identity">
-					<N8nText size="medium" color="text-dark">{{ admin.fullName }}</N8nText>
+					<N8nText size="medium" color="text-dark">{{ displayName(admin) }}</N8nText>
 					<N8nLink :to="mailtoHref(admin.email)" size="small" theme="text">
 						{{ admin.email }}
 					</N8nLink>
