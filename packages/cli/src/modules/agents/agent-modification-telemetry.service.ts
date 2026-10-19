@@ -108,14 +108,14 @@ export type AgentMutationSnapshot = ReturnType<typeof captureAgentMutation>;
 
 export type AgentSidecarChanges = Partial<Record<'tools' | 'skills' | 'tasks', boolean>>;
 
-export function buildAgentMutationEvent(
-	agent: Agent,
+export function buildAgentMutationEvent<AgentType extends Agent>(
+	agent: AgentType,
 	skillRefs: AgentSkillRefs,
 	projectId: string,
 	context: AgentMutationTelemetryContext,
 	previous: AgentMutationSnapshot,
 	sidecarChanges: AgentSidecarChanges,
-): AgentModificationEvent {
+): AgentModificationEvent & { agent: AgentType } {
 	const config = agent.schema ? toAgentDocument(agent.schema, skillRefs) : null;
 	return {
 		agent,
