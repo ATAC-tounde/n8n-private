@@ -430,6 +430,7 @@ $expand-easing: motion.$blur-motion-easing;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: var(--settings-row--description-lines, 2);
 	overflow: hidden;
+	overflow-wrap: anywhere;
 }
 
 .action {

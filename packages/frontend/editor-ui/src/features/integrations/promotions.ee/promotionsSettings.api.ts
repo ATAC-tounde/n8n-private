@@ -15,7 +15,6 @@ import type {
 	PromotePackageDto,
 	PromotePackageResultDto,
 	PromotionProviderCreatedPublicDto,
-	PromotionProviderListPublicDto,
 	PromotionProviderPublicDto,
 	PromotionRepositoryListPublicDto,
 	PromotionBranchListPublicDto,
@@ -23,24 +22,12 @@ import type {
 	UpdatePromotionProviderDto,
 } from '@n8n/api-types';
 import type { PublicApiContext } from '@n8n/rest-api-client';
-import { request } from '@n8n/rest-api-client';
+import { request, ResponseError } from '@n8n/rest-api-client';
 
 /** Includes the SSH public key. */
 export type PromotionProvider = PromotionProviderPublicDto;
-/** Omits the SSH public key. */
-export type PromotionProviderSummary = PromotionProviderListPublicDto['data'][number];
 export type PromotionEnvironment = PromotionEnvironmentPublicDto;
 export type { PromotionEnvironmentSummary };
-/**
- * The settings page shows one environment for each direction as one connection. The
- * shared fields come from the Apply environment, else from the Promote one.
- */
-export type PromotionConnection = Pick<PromotionEnvironment, 'name' | 'provider' | 'remote'> & {
-	configs: {
-		apply?: Extract<PromotionEnvironment, { direction: 'apply' }>;
-		promote?: Extract<PromotionEnvironment, { direction: 'promote' }>;
-	};
-};
 
 const promotionsApiRoot = '/promotions';
 
@@ -84,19 +71,6 @@ async function fetchAllPages<T>(
 	return items;
 }
 
-export const fetchPromotionProviders = async (
-	context: PublicApiContext,
-): Promise<PromotionProviderSummary[]> =>
-	await fetchAllPages(
-		async (cursor) =>
-			await request({
-				method: 'GET',
-				baseURL: context.baseUrl,
-				endpoint: `${promotionsApiRoot}/providers`,
-				data: { cursor },
-			}),
-	);
-
 /** Fetches the provider with its SSH public key. */
 export const fetchPromotionProvider = async (
 	context: PublicApiContext,
@@ -131,15 +105,26 @@ export const updatePromotionProvider = async (
 		data: payload,
 	});
 
-export const deletePromotionProvider = async (
-	context: PublicApiContext,
-	id: string,
-): Promise<void> => {
+const deletePromotionProvider = async (context: PublicApiContext, id: string): Promise<void> => {
 	await request({
 		method: 'DELETE',
 		baseURL: context.baseUrl,
 		endpoint: `${promotionsApiRoot}/providers/${id}`,
 	});
+};
+
+/** The API refuses to delete a provider that an environment still uses, in any scope. */
+export const deleteProviderIfUnused = async (context: PublicApiContext, id: string) => {
+	try {
+		await deletePromotionProvider(context, id);
+	} catch (error) {
+		if (
+			error instanceof ResponseError &&
+			(error.httpStatusCode === 404 || error.httpStatusCode === 409)
+		)
+			return;
+		throw error;
+	}
 };
 
 export const fetchPromotionEnvironments = async (
@@ -164,7 +149,7 @@ export const fetchPromotionEnvironment = async (
 	await request({
 		method: 'GET',
 		baseURL: context.baseUrl,
-		endpoint: `${promotionsApiRoot}/environments/${id}`,
+		endpoint: `${promotionsApiRoot}/environments/${encodeURIComponent(id)}`,
 	});
 
 export const createPromotionEnvironment = async (
@@ -186,7 +171,7 @@ export const updatePromotionEnvironment = async (
 	await request({
 		method: 'PUT',
 		baseURL: context.baseUrl,
-		endpoint: `${promotionsApiRoot}/environments/${id}`,
+		endpoint: `${promotionsApiRoot}/environments/${encodeURIComponent(id)}`,
 		data: payload,
 	});
 
@@ -210,17 +195,6 @@ export const clonePromotionCheckout = async (
 		method: 'POST',
 		baseURL: context.baseUrl,
 		endpoint: `${promotionsApiRoot}/environments/${environmentId}/clone`,
-	});
-
-/** Removes the environment's local checkout. Keeps the environment and its credentials. */
-export const disconnectPromotionCheckout = async (
-	context: PublicApiContext,
-	environmentId: string,
-): Promise<PromotionCheckoutPublicDto> =>
-	await request({
-		method: 'POST',
-		baseURL: context.baseUrl,
-		endpoint: `${promotionsApiRoot}/environments/${environmentId}/disconnect`,
 	});
 
 /** Promotes the whole instance through its instance Promote environment. */
