@@ -52,6 +52,7 @@ function setup(options: { useEvalModelCatalog?: boolean } = {}) {
 		mock(),
 		mock(),
 		mock(),
+		mock(),
 	);
 
 	const service = new InstanceAiBuilderDelegateAdapterService(
