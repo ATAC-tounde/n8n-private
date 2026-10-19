@@ -3,6 +3,7 @@ import { ROLE } from '@n8n/api-types';
 import { N8nAvatar, N8nDialog, N8nLink, N8nLoading, N8nText } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { PROJECT_ADMIN_ROLE_SLUG } from '@n8n/permissions';
+import type { IUserResponse } from '@n8n/rest-api-client';
 import { useUsersStore } from '@n8n/stores/users.store';
 import { computed, ref, watch } from 'vue';
 
@@ -45,7 +46,7 @@ const mailSubject = computed(() =>
 	}),
 );
 
-type Admin = { id: string; firstName?: string | null; lastName?: string | null; email: string };
+type Admin = Pick<IUserResponse, 'id' | 'firstName' | 'lastName'> & { email: string };
 
 function hasEmail<T extends { email?: string | null }>(person: T): person is T & { email: string } {
 	return Boolean(person.email);
