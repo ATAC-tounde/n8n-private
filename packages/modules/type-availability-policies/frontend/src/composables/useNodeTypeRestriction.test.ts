@@ -122,7 +122,7 @@ describe('useNodeTypeRestriction', () => {
 		expect(describeAgentToolRestriction('Slack', { scope: 'project' })).toBe(
 			"Slack is restricted in this project. The agent can't use it.",
 		);
-		expect(describeAgentToolRestriction('Slack')).toBe(
+		expect(describeAgentToolRestriction('Slack', undefined)).toBe(
 			"Slack is restricted. The agent can't use it.",
 		);
 	});
@@ -137,17 +137,7 @@ describe('useNodeTypeRestriction', () => {
 				contact: 'optIn',
 			},
 			{ verdict: { scope: 'project' }, projectType: 'personal', contact: 'instance' },
-			{
-				verdict: { scope: 'instance', optInAvailable: true },
-				projectType: 'personal',
-				contact: 'instance',
-			},
-			{ verdict: { scope: 'project' }, projectType: null, contact: 'project' },
-			{
-				verdict: { scope: 'instance', optInAvailable: true },
-				projectType: null,
-				contact: 'instance',
-			},
+			{ verdict: { scope: 'project' }, projectType: null, contact: 'instance' },
 		] as const)(
 			'resolves $verdict in a $projectType project to $contact',
 			({ verdict, projectType, contact }) => {
@@ -156,13 +146,11 @@ describe('useNodeTypeRestriction', () => {
 		);
 	});
 
-	it('ignores the loaded project when the verdict names another project', () => {
+	it('uses the loaded project only when the restriction comes from it', () => {
 		mockPolicyProject({ id: 'team-project', type: 'team' });
 
-		expect(getRestrictionContact({ scope: 'instance', optInAvailable: true })).toBe('optIn');
-		expect(
-			getRestrictionContact({ scope: 'instance', optInAvailable: true }, 'other-project'),
-		).toBe('instance');
+		expect(getRestrictionContact({ scope: 'project' }, 'team-project')).toBe('project');
+		expect(getRestrictionContact({ scope: 'project' }, 'other-project')).toBe('instance');
 	});
 
 	it('points the next step to a project admin for a project restriction', () => {
