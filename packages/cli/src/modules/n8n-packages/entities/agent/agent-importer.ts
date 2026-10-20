@@ -63,8 +63,6 @@ export class AgentImporter {
 			const definition = completeDefinition(item);
 			const options = {
 				metadata: {
-					sourceAgentId: item.sourceAgentId,
-					sourceTaskIds: new Map([...item.taskIds].map(([source, target]) => [target, source])),
 					availableInMCP: item.availableInMCP,
 				},
 				plannedDestinations: plan.plannedDestinations,
